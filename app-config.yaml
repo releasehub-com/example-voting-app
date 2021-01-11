@@ -1,0 +1,105 @@
+---
+app: example-voting-app
+auto_deploy: true
+context: release-handsup-us-east-1
+domain: example-voting-app.releaseapp.gethandsup.com
+mode: development
+repo_name: dustyspace/example-voting-app
+hostnames:
+- vote: vote-${env_id}-${domain}
+- result: result-${env_id}-${domain}
+environment_templates:
+- name: ephemeral
+- name: permanent
+resources:
+  cpu:
+    limits: 500m
+    requests: 100m
+  memory:
+    limits: 1Gi
+    requests: 100Mi
+  replicas: 1
+services:
+- name: vote
+  image: dustyspace/example-voting-app/vote
+  has_repo: true
+  static: false
+  volumes: []
+  args:
+  - python
+  - app.py
+  depends_on:
+  - worker
+  ports:
+  - port: '5000'
+    type: node_port
+    target_port: '80'
+  build:
+    context: "./vote"
+  autoscale:
+    min_replicas: 3
+    max_replicas: 10
+    metrics:
+    - resource:
+        name: cpu
+        average_utilization: 50
+    - resource:
+        name: memory
+        average_value: 100Mi
+- name: result
+  image: dustyspace/example-voting-app/result
+  has_repo: true
+  static: false
+  volumes: []
+  args:
+  - nodemon
+  - server.js
+  depends_on:
+  - worker
+  ports:
+  - port: '5001'
+    type: node_port
+    target_port: '80'
+  - port: '5858'
+    type: node_port
+    target_port: '5858'
+  build:
+    context: "./result"
+- name: worker
+  image: dustyspace/example-voting-app/worker
+  has_repo: true
+  static: false
+  depends_on:
+  - redis
+  - db
+  build:
+    context: "./worker"
+- name: redis
+  image: redis:alpine
+  ports:
+  - port: '6379'
+    type: container_port
+- name: db
+  image: postgres:9.6.1
+  volumes:
+  - name: db-data
+    type: persistent
+    mount_path: "/var/lib/postgresql/data"
+  ports:
+  - port: '5432'
+    type: container_port
+  storage:
+    size: 10Gi
+    type: aws-efs
+workflows:
+- name: setup
+  order_from:
+  - services.all
+- name: patch
+  order_from:
+  - services.vote
+  - services.result
+  - services.worker
+  - services.redis
+  - services.db
+
