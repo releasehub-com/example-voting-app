@@ -1,10 +1,13 @@
 from flask import Flask, render_template, request, make_response, g
 from redis import Redis
+from dotenv import load_dotenv
+
 import os
 import socket
 import random
 import json
 
+load_dotenv(verbose=True)
 option_a = os.getenv('OPTION_A', "Bidenie")
 option_b = os.getenv('OPTION_B', "Trumpie")
 hostname = socket.gethostname()
@@ -13,7 +16,8 @@ app = Flask(__name__)
 
 def get_redis():
     if not hasattr(g, 'redis'):
-        g.redis = Redis(host="redis", db=0, socket_timeout=5)
+        redis_host = os.getenv('VOTE_REDIS_HOST', "redis")
+        g.redis = Redis(host=redis_host, db=0, socket_timeout=5)
     return g.redis
 
 @app.route("/", methods=['POST','GET'])

@@ -10,6 +10,8 @@ RUN ["mvn", "verify"]
 COPY ["src/main", "/code/src/main"]
 RUN ["mvn", "package"]
 
+RUN "echo 'i see you tommy'"
+
 FROM openjdk:8-jre-alpine
 
 COPY --from=build /code/target/worker-jar-with-dependencies.jar /
