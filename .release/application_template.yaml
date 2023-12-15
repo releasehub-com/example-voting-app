@@ -1,0 +1,96 @@
+---
+auto_deploy: true
+context: release-customer-us-west-2
+domain: rls.sh
+repo_name: releasehub-com/example-voting-app
+hostnames:
+- result: result-vote-${env_id}.${domain}
+- vote: vote-vote-${env_id}.${domain}
+environment_templates:
+- name: ephemeral
+- name: permanent
+resources:
+  cpu:
+    limits: 1000m
+    requests: 100m
+  memory:
+    limits: 1Gi
+    requests: 100Mi
+  replicas: 1
+services:
+- name: db
+  image: postgres:9.4
+  has_repo: false
+- name: redis
+  image: redis:alpine
+  has_repo: false
+  ports:
+  - type: container_port
+    port: '6379'
+    loadbalancer: false
+- name: result
+  image: releasehub-com/example-voting-app/result
+  build:
+    context: result
+  has_repo: true
+  volumes: []
+  args:
+  - nodemon
+  - server.js
+  ports:
+  - type: node_port
+    target_port: '80'
+    port: '5001'
+    loadbalancer: false
+  - type: node_port
+    target_port: '5858'
+    port: '5858'
+    loadbalancer: false
+- name: vote
+  image: releasehub-com/example-voting-app/vote
+  build:
+    context: vote
+  has_repo: true
+  volumes: []
+  args:
+  - python
+  - app.py
+  ports:
+  - type: node_port
+    target_port: '80'
+    port: '5000'
+    loadbalancer: false
+- name: worker
+  image: releasehub-com/example-voting-app/worker
+  build:
+    context: worker
+  has_repo: true
+  args:
+  - java
+  - "-XX:+UnlockExperimentalVMOptions"
+  - "-XX:+UseCGroupMemoryLimitForHeap"
+  - "-jar"
+  - "/worker-jar-with-dependencies.jar"
+workflows:
+- name: setup
+  parallelize:
+  - step: services-0
+    tasks:
+    - services.db
+    - services.redis
+    - services.result
+    - services.vote
+    - services.worker
+- name: patch
+  parallelize:
+  - step: services-0
+    tasks:
+    - services.result
+    - services.vote
+    - services.worker
+- name: teardown
+  parallelize:
+  - step: remove-environment
+    tasks:
+    - release.remove_environment
+
