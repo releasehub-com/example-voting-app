@@ -1,5 +1,6 @@
 FROM node:10-slim
 
+
 WORKDIR /app
 
 RUN npm install -g nodemon
